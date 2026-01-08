@@ -4,62 +4,34 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"log"
+	"os"
 
-	"github.com/playwright-community/playwright-go"
+	"gopkg.in/yaml.v3"
+
+	"thesheps.dev/whisky-tracker/scraper"
 )
 
 // main initializes the whisky tracker module.
 func main() {
-	err := playwright.Install()
+	// Load configuration from config.yml
+	bytes, err := os.ReadFile("config.yml")
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to read config file: %v", err)
 	}
 
-	pw, err := playwright.Run()
+	var cfg scraper.Config
+	err = yaml.Unmarshal(bytes, &cfg)
 	if err != nil {
-		panic(err)
-	}
-	defer pw.Stop()
-
-	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(true),
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer browser.Close()
-
-	context, err := browser.NewContext(playwright.BrowserNewContextOptions{
-		UserAgent: playwright.String(
-			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-		),
-	})
-	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	page, err := context.NewPage()
+	// Create scraper and scrape price
+	scraper := &scraper.Scraper{}
+	price, err := scraper.Scrape(cfg.ScrapeConfig)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to scrape price: %v", err)
 	}
 
-	_, err = page.Goto(
-		"https://www.thewhiskyexchange.com/p/85794/bunnahabhain-12-year-old-cask-strength-2025-release",
-		playwright.PageGotoOptions{
-			WaitUntil: playwright.WaitUntilStateDomcontentloaded,
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	priceLocator := page.Locator(".product-action__price")
-
-	text, err := priceLocator.First().TextContent()
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(strings.TrimSpace(text))
+	fmt.Printf("Current price: %s\n", price)
 }
